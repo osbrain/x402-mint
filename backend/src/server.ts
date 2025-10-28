@@ -150,12 +150,12 @@ app.get("/stats", async (_req: Request, res: Response) => {
     const mintUnit6 = BigInt(MINT_USDC_6);
 
     res.json({
-      tokenAddress: TOKEN_ADDRESS,
-      treasury: TREASURY,
-      distributor: distributorAddress,
-      owner: ownerAddress,
+      tokenAddress: ethers.getAddress(TOKEN_ADDRESS),
+      treasury: ethers.getAddress(TREASURY),
+      distributor: ethers.getAddress(distributorAddress),
+      owner: ethers.getAddress(ownerAddress),
       chainId: CHAIN_ID,
-      usdcAddress: USDC_ADDRESS,
+      usdcAddress: ethers.getAddress(USDC_ADDRESS),
       totalSupplyTokens: ethers.formatUnits(totalSupply, 18),
       mintedTokens: ethers.formatUnits(minted, 18),
       remainingTokens: ethers.formatUnits(contractBalance, 18),

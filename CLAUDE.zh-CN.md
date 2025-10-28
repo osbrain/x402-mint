@@ -84,7 +84,7 @@ pnpm run start                  # 启动生产服务器
 - `CHAIN_ID`（Base 主网 8453，Sepolia 84532）
 
 **关键配置：** `USDC_ADDRESS` 必须是 Base 上正确的 USDC 代币地址：
-- Base 主网：`0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366`（Circle 官方 USDC）
+- Base 主网：`0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`（Circle 官方 USDC）
 - Base Sepolia：`0x036CbD53842c5426634e7929541eC2318f3dCF7e`（常用测试代币）
 
 ## 重要运营细节

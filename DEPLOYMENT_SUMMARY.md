@@ -66,7 +66,7 @@
 
 ### USDC 地址（Base 主网）
 ```
-0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366
+0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
 ```
 **说明**：Circle Native USDC on Base
 

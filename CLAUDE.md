@@ -84,7 +84,7 @@ The system requires proper `.env` setup at three levels:
 - `CHAIN_ID` (8453 for Base mainnet, 84532 for Sepolia)
 
 **Critical:** `USDC_ADDRESS` must be the correct USDC token on Base:
-- Base mainnet: `0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366` (Circle native USDC)
+- Base mainnet: `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` (Circle native USDC)
 - Base Sepolia: `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (common testnet)
 
 ## Important Operational Details

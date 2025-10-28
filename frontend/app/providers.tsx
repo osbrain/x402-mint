@@ -3,7 +3,7 @@
 import { ReactNode, useMemo } from 'react';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
+import { metaMask } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const rpcBase = process.env.NEXT_PUBLIC_BASE_RPC || 'https://mainnet.base.org';
@@ -11,7 +11,14 @@ const rpcBaseSepolia = process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC || 'https://sepo
 
 const config = createConfig({
   chains: [base, baseSepolia],
-  connectors: [injected()],
+  connectors: [
+    metaMask({
+      dappMetadata: {
+        name: 'LICODE Mint',
+        url: typeof window !== 'undefined' ? window.location.origin : 'https://localhost:3000',
+      },
+    }),
+  ],
   transports: {
     [base.id]: http(rpcBase),
     [baseSepolia.id]: http(rpcBaseSepolia)

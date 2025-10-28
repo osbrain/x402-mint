@@ -245,7 +245,7 @@ cp .env.example .env
 # 必需配置
 RPC_URL_BASE="https://mainnet.base.org"
 TOKEN_ADDRESS="0x合约地址"           # 步骤1部署的地址
-USDC_ADDRESS="0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366"  # Base 主网 USDC
+USDC_ADDRESS="0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # Base 主网 USDC
 TREASURY_ADDRESS="0x收款地址"        # 接收用户 USDC 的地址
 DISTRIBUTOR_PRIVATE_KEY="0x..."     # 对应合约中的 DISTRIBUTOR_ADDRESS
 MINT_USDC_6="1000000"               # 1 USDC
@@ -293,7 +293,7 @@ cp .env.example .env.local
 ```bash
 NEXT_PUBLIC_CHAIN_ID=8453
 NEXT_PUBLIC_TOKEN_ADDRESS="0x合约地址"
-NEXT_PUBLIC_USDC_ADDRESS="0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366"
+NEXT_PUBLIC_USDC_ADDRESS="0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
 NEXT_PUBLIC_TREASURY_ADDRESS="0x收款地址"
 NEXT_PUBLIC_MINT_USDC="1"  # 用户界面显示
 ```
@@ -401,7 +401,7 @@ sequenceDiagram
 
 | 网络 | Chain ID | RPC URL | USDC 地址 |
 |------|----------|---------|-----------|
-| Base Mainnet | 8453 | https://mainnet.base.org | `0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366` |
+| Base Mainnet | 8453 | https://mainnet.base.org | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
 | Base Sepolia | 84532 | https://sepolia.base.org | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ### 重要地址说明
@@ -520,7 +520,7 @@ sudo systemctl start redis # Linux
 **问题 3: USDC 地址错误**
 ```bash
 # 确认使用正确网络的 USDC 地址
-# Base 主网: 0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366
+# Base 主网: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
 # Base Sepolia: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
 ```
 

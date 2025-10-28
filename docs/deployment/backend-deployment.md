@@ -158,7 +158,7 @@ TOKEN_ADDRESS="0x合约地址"
 
 # USDC 地址
 # Base 主网：
-USDC_ADDRESS="0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366"
+USDC_ADDRESS="0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
 
 # Base Sepolia 测试网：
 # USDC_ADDRESS="0x036CbD53842c5426634e7929541eC2318f3dCF7e"
@@ -218,7 +218,7 @@ NODE_ENV="production"
 
 | 网络 | Chain ID | USDC 地址 |
 |------|----------|-----------|
-| Base Mainnet | 8453 | `0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366` |
+| Base Mainnet | 8453 | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
 | Base Sepolia | 84532 | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 #### 安全配置说明
@@ -733,7 +733,7 @@ curl http://localhost:3001/health | jq '.distributorBalance'
 **解决方案**:
 ```bash
 # 确认使用正确网络的 USDC 地址
-# Base 主网: 0x833589fCD6eDb6E08f4c7C38f3dCF7E808A7C366
+# Base 主网: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
 # Base Sepolia: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
 
 # 更新 .env
