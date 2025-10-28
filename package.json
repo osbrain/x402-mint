@@ -1,0 +1,21 @@
+{
+  "name": "licode-x402",
+  "private": true,
+  "scripts": {
+    "build": "hardhat compile",
+    "deploySepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "deploy": "hardhat run scripts/deploy.ts --network base",
+    "verify": "hardhat run scripts/verify.ts --network base"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^20.11.0",
+    "dotenv": "^16.4.0",
+    "hardhat": "^2.22.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}
