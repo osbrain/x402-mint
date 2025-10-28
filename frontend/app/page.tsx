@@ -3,7 +3,7 @@
 import axios from 'axios';
 import QRCode from 'react-qr-code';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useChainId } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useChainId, useWatchAsset } from 'wagmi';
 import { parseUnits, getAddress } from 'viem';
 import { base } from 'wagmi/chains';
 
@@ -64,7 +64,7 @@ export default function Page() {
   const [addrManual, setAddrManual] = useState('');
   const [msg, setMsg] = useState('');
   const [autoTxHash, setAutoTxHash] = useState<`0x${string}` | undefined>(undefined);
-  const [hasMetaMask, setHasMetaMask] = useState(false);
+  const [isAddingToken, setIsAddingToken] = useState(false);
 
   const { address, isConnected } = useAccount();
   const { connect, connectors, status: connectStatus, error: connectError } = useConnect();
@@ -73,13 +73,8 @@ export default function Page() {
   const { data: receipt, isLoading: waitingReceipt } = useWaitForTransactionReceipt({ hash: autoTxHash, chainId: stats?.chainId });
   const { switchChainAsync } = useSwitchChain();
   const currentChainId = useChainId();
+  const { watchAsset } = useWatchAsset();
 
-  // Check if MetaMask is installed
-  useEffect(() => {
-    if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
-      setHasMetaMask(true);
-    }
-  }, []);
 
   const amountReadable = useMemo(() => {
     if (stats) return stats.mintUnitUsdc;
@@ -251,6 +246,51 @@ export default function Page() {
     }
   };
 
+  const addTokenToWallet = async () => {
+    if (!isConnected) {
+      setMsg('Please connect your wallet first');
+      return;
+    }
+    
+    if (!stats?.tokenAddress) {
+      setMsg('Token address not loaded yet');
+      return;
+    }
+    
+    setIsAddingToken(true);
+    
+    try {
+      const tokenAddress = getAddress(stats.tokenAddress);
+      console.log(tokenAddress)
+      
+      setMsg('Adding LICODE token to wallet...');
+      
+      await watchAsset({
+        type: 'ERC20',
+        options: {
+          address: tokenAddress,
+          symbol: 'LICODE',
+          decimals: 18,
+          // image: 'https://example.com/token-logo.png' // optional: add token logo URL
+        }
+      });
+
+      setMsg('LICODE token added to wallet successfully!');
+    } catch (err: any) {
+      console.error('Add token error:', err);
+      // Better error handling for common issues
+      if (err?.message?.includes('User rejected')) {
+        setMsg('You cancelled adding the token to your wallet');
+      } else if (err?.message?.includes('already been added')) {
+        setMsg('LICODE token is already in your wallet');
+      } else {
+        setMsg(err?.message || 'Failed to add token to wallet');
+      }
+    } finally {
+      setIsAddingToken(false);
+    }
+  };
+
   const renderContractInfo = () => (
     <div className="space-y-3 text-sm">
       <AddressRow label="Treasury" value={stats?.treasury || payTo} onCopy={() => copyToClipboard(stats?.treasury || payTo)} />
@@ -275,6 +315,17 @@ export default function Page() {
             </div>
           </div>
         </header>
+
+        <div className="flex justify-center -mt-8 mb-4">
+          <button
+            className="px-3 py-2 rounded-full border border-white/10 bg-white/5 text-sm text-white/80 hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={addTokenToWallet}
+            type="button"
+            disabled={isAddingToken}
+          >
+            {isAddingToken ? '⏳ Adding...' : '🔖 Add LICODE to Wallet'}
+          </button>
+        </div>
 
         <section className={sectionClass}>
           <div className="flex items-center justify-between mb-5">
@@ -446,14 +497,14 @@ export default function Page() {
             <div className="space-y-5 text-sm">
               <StepHeading number={1} title="Connect Wallet" subtitle="Connect your EVM-compatible wallet" />
 
-              {!hasMetaMask && (
+              {connectors.length === 0 && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">⚠️</span>
                     <div>
-                      <p className="font-semibold mb-1">MetaMask Not Detected</p>
+                      <p className="font-semibold mb-1">No Wallet Detected</p>
                       <p className="text-xs text-white/80 mb-3">
-                        We couldn't detect MetaMask in your browser. Please install it to continue.
+                        We couldn't detect any compatible wallet in your browser. Please install MetaMask or another EVM wallet to continue.
                       </p>
                       <a
                         href="https://metamask.io/download/"
@@ -529,7 +580,7 @@ export default function Page() {
                             setMsg('');
                             connect({ connector });
                           }}
-                          disabled={!hasMetaMask || connectStatus === 'pending'}
+                          disabled={connectStatus === 'pending'}
                         >
                           {connectStatus === 'pending' ? '🔄 Connecting...' : `🦊 Connect with ${connector.name}`}
                         </button>
