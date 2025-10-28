@@ -4,10 +4,11 @@ const nextConfig = {
 
   // API 代理到后端
   async rewrites() {
+    const api = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:3001/:path*"
+        destination: `${api}/:path*`
       }
     ];
   },
