@@ -323,12 +323,13 @@ export default function Page() {
           </div>
         </section>
 
-        <section className={sectionClass}>
+        {/* Contract Information section - commented out */}
+        {/* <section className={sectionClass}>
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <span>📄</span> Contract Information
           </h2>
           {renderContractInfo()}
-        </section>
+        </section> */}
 
         {/* Always show payment section, no need for "Start Minting Process" button */}
         <section className={sectionClass}>
