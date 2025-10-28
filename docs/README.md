@@ -1,80 +1,36 @@
 # LICODE x402 项目文档
 
-欢迎来到 LICODE x402 项目文档中心。这里包含了项目的完整文档，包括部署指南、安全配置、架构说明等。
+LICODE x402 代币铸造系统完整文档。
 
-## 📚 文档目录
+---
 
-### 🚀 部署文档
+## 📚 核心文档
 
-快速部署指南和详细步骤：
+### 📦 [部署指南](./DEPLOYMENT.md)
 
-- **[合约部署指南](deployment/contract-deployment.md)**
-  - 智能合约编译和部署
-  - 网络配置和参数说明
-  - 合约验证流程
-  - 部署后配置
+完整的部署流程和配置说明：
+- ✅ 已部署信息摘要
+- 🚀 合约/后端/前端部署步骤
+- ✅ 部署验证清单
+- 🔧 角色和权限说明
+- 🐛 故障排查
+- 📊 监控和维护
 
-- **[后端部署指南](deployment/backend-deployment.md)**
-  - 后端服务安装和配置
-  - PM2/Docker/Systemd 部署方式
-  - Redis 配置
-  - 监控和日志管理
+**适合**: 开发者、运维人员
 
-- **[前端部署指南](deployment/frontend-deployment.md)**
-  - 前端应用构建和部署
-  - Vercel/传统服务器/Docker 部署
-  - 环境变量配置
-  - 性能优化建议
+---
 
-- **[部署验证指南](deployment/部署验证指南.md)**
-  - 完整的部署验证流程
-  - 功能测试清单
-  - 常见问题排查
-
-### 🔒 安全文档
+### 🔒 [安全指南](./SECURITY.md)
 
 生产环境安全配置和最佳实践：
+- 🛡️ Redis 防重放攻击
+- ⚡ 速率限制配置
+- 🌐 CORS 保护
+- 🔑 私钥管理
+- 📊 监控和告警
+- 🚨 安全检查清单
 
-- **[安全加固部署指南](security/安全加固部署指南.md)**
-  - 生产环境安全配置
-  - Redis 防重放攻击
-  - 速率限制和 CORS
-  - 优雅关闭和容错
-
-- **[安全校验分析](security/安全校验分析.md)**
-  - 安全审计要点
-  - 代码安全分析
-  - 潜在风险识别
-
-- **[权限配置指南](security/权限配置指南.md)**
-  - 角色和权限管理
-  - Owner/Distributor 职责
-  - 私钥安全管理
-  - 最佳实践建议
-
-- **[安全加固完成总结](security/安全加固完成总结.md)**
-  - 已实施的安全措施
-  - 安全功能清单
-  - 验证结果
-
-### 🏗 架构文档
-
-系统设计和技术架构：
-
-- **[技术架构文档](architecture/licode_x_402_mint_prd_full_stack_scaffold.md)**
-  - 完整的系统架构说明
-  - 技术选型和设计决策
-  - 数据流程和交互
-  - PRD 和实现细节
-
-### 📖 使用指南
-
-功能说明和操作指南：
-
-- **[功能完整性检查](guides/功能完整性检查.md)**
-  - 功能测试清单
-  - 完整性验证
-  - 测试用例
+**适合**: 安全审计员、运维人员
 
 ---
 
@@ -82,59 +38,32 @@
 
 ### 我是开发者
 
-**首次部署？** 按照以下顺序阅读文档：
+**首次部署？**
+1. 阅读 [部署指南](./DEPLOYMENT.md)
+2. 按照步骤部署合约 → 后端 → 前端
+3. 完成部署验证
 
-1. [合约部署指南](deployment/contract-deployment.md)
-2. [后端部署指南](deployment/backend-deployment.md)
-3. [前端部署指南](deployment/frontend-deployment.md)
-4. [部署验证指南](deployment/部署验证指南.md)
-
-**准备上线？** 查看安全文档：
-
-1. [安全加固部署指南](security/安全加固部署指南.md)
-2. [权限配置指南](security/权限配置指南.md)
-3. [安全校验分析](security/安全校验分析.md)
+**准备上线？**
+1. 阅读 [安全指南](./SECURITY.md)
+2. 配置 Redis、速率限制、CORS
+3. 设置 HTTPS 和监控
 
 ### 我是运维人员
 
 **日常维护：**
-- [后端部署指南 - 监控和维护](deployment/backend-deployment.md#监控和维护)
-- [部署验证指南 - 健康检查](deployment/部署验证指南.md)
+- [监控和维护](./DEPLOYMENT.md#监控和维护)
+- [安全检查清单](./SECURITY.md#安全检查清单)
 
 **故障排查：**
-- [合约部署指南 - 故障排查](deployment/contract-deployment.md#故障排查)
-- [后端部署指南 - 故障排查](deployment/backend-deployment.md#故障排查)
-- [前端部署指南 - 故障排查](deployment/frontend-deployment.md#故障排查)
+- [部署故障排查](./DEPLOYMENT.md#故障排查)
+- [安全事件响应](./SECURITY.md#安全事件响应)
 
 ### 我是安全审计员
 
 **安全审查：**
-1. [安全校验分析](security/安全校验分析.md)
-2. [权限配置指南](security/权限配置指南.md)
-3. [技术架构文档](architecture/licode_x_402_mint_prd_full_stack_scaffold.md)
-
----
-
-## 📦 项目结构
-
-```
-docs/
-├── README.md                 # 本文件 - 文档索引
-├── deployment/              # 部署文档
-│   ├── contract-deployment.md        # 合约部署
-│   ├── backend-deployment.md         # 后端部署
-│   ├── frontend-deployment.md        # 前端部署
-│   └── 部署验证指南.md                # 部署验证
-├── security/                # 安全文档
-│   ├── 安全加固部署指南.md            # 安全配置
-│   ├── 安全校验分析.md               # 安全审计
-│   ├── 权限配置指南.md               # 权限管理
-│   └── 安全加固完成总结.md            # 安全总结
-├── architecture/            # 架构文档
-│   └── licode_x_402_mint_prd_full_stack_scaffold.md
-└── guides/                  # 使用指南
-    └── 功能完整性检查.md
-```
+1. [安全架构](./SECURITY.md#安全架构)
+2. [安全审计要点](./SECURITY.md#安全审计)
+3. [部署安全检查](./DEPLOYMENT.md#安全检查清单)
 
 ---
 
@@ -160,34 +89,38 @@ docs/
 ### 核心流程
 
 ```
-用户 → 转账 USDC → 后端验证 → 合约分发 → 用户收到 LICODE
+用户支付 USDC → 后端验证 → 合约分发 → 用户收到 LICODE
 ```
 
-详细流程图请参考：[技术架构文档](architecture/licode_x_402_mint_prd_full_stack_scaffold.md)
+---
+
+## 📋 已部署信息
+
+**部署时间**: 2025-10-28
+**部署网络**: Base Mainnet (Chain ID: 8453)
+
+| 项目 | 值 |
+|------|-----|
+| **合约地址** | `0x835A383202e7BdA19B1849647eFa697fe4Bef101` |
+| **Owner** | `0x7488966a774199BD475763D9f9Ea99F17a273652` |
+| **Distributor** | `0x4eb111A2bdB7F8a4e0DDE5E099210a7408C50a20` |
+| **USDC 地址** | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
+| **Basescan** | https://basescan.org/address/0x835A383202e7BdA19B1849647eFa697fe4Bef101 |
 
 ---
 
 ## 💡 最佳实践
 
 ### 部署前
-
 - ✅ 在测试网完整测试所有功能
 - ✅ 准备好所有必需的地址和私钥
 - ✅ 确认网络配置（主网 vs 测试网）
-- ✅ 计算好 gas 预算
-
-### 部署中
-
-- ✅ 按顺序部署：合约 → 后端 → 前端
-- ✅ 每个步骤后进行验证
-- ✅ 记录所有合约地址和交易哈希
-- ✅ 备份所有配置文件
 
 ### 部署后
-
 - ✅ 完成部署验证清单
-- ✅ 配置监控和告警
-- ✅ 准备应急预案
+- ✅ 配置 Redis 防重放攻击
+- ✅ 启用速率限制和 CORS
+- ✅ 设置监控和告警
 - ✅ 定期检查 Distributor 余额
 
 ---
@@ -195,28 +128,40 @@ docs/
 ## 🆘 获取帮助
 
 ### 常见问题
+- [部署故障排查](./DEPLOYMENT.md#故障排查)
+- [安全事件响应](./SECURITY.md#安全事件响应)
 
-大多数问题可以在各个部署指南的"故障排查"章节找到解决方案：
-
-- [合约部署故障排查](deployment/contract-deployment.md#故障排查)
-- [后端部署故障排查](deployment/backend-deployment.md#故障排查)
-- [前端部署故障排查](deployment/frontend-deployment.md#故障排查)
-
-### 联系支持
-
-- 📧 Email: support@licode.com
-- 💬 Discord: https://discord.gg/licode
-- 🐛 Issues: https://github.com/licode/x402mint/issues
+### 相关资源
+- **合约地址**: https://basescan.org/address/0x835A383202e7BdA19B1849647eFa697fe4Bef101
+- **Base 官网**: https://base.org
+- **USDC on Base**: https://www.circle.com/en/usdc-on-base
 
 ---
 
-## 🔄 文档更新
+## 📦 项目结构
 
-本文档会持续更新。最后更新时间：2025-10
+```
+x402mint/
+├── contracts/          # Solidity 智能合约
+├── backend/           # Express 后端服务
+├── frontend/          # Next.js 前端应用
+├── scripts/           # 部署和管理脚本
+└── docs/             # 📖 项目文档
+    ├── README.md         # 本文件 - 文档导航
+    ├── DEPLOYMENT.md     # 部署指南
+    └── SECURITY.md       # 安全指南
+```
 
-### 版本历史
+---
 
-- **v1.0** (2025-10): 初始版本，包含完整部署和安全文档
+## 🔄 文档版本
+
+**当前版本**: v2.0
+**最后更新**: 2025-10-28
+
+### 更新历史
+- **v2.0** (2025-10-28): 精简文档结构，合并为 3 个核心文件
+- **v1.0** (2025-10): 初始版本
 
 ---
 
@@ -230,16 +175,10 @@ docs/
 
 ---
 
-## 📄 许可证
-
-本项目采用 MIT 许可证。详见 [LICENSE](../LICENSE) 文件。
-
----
-
 <div align="center">
 
-**📚 Happy Reading! 祝你部署顺利！**
+**📚 开始使用 LICODE x402**
 
-[返回主 README](../README.md)
+[部署系统](./DEPLOYMENT.md) · [安全配置](./SECURITY.md) · [返回主页](../README.md)
 
 </div>
