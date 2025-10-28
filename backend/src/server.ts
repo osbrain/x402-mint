@@ -66,10 +66,6 @@ if (ENABLE_RATE_LIMIT) {
   const verifyLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 5,
-    keyGenerator: (req) => {
-      const user = (req.body?.user || '').toLowerCase();
-      return `${req.ip}:${user}`;
-    },
     message: { error: 'Too many verification attempts, please wait' }
   });
 
