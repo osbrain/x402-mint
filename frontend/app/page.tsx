@@ -57,7 +57,7 @@ export default function Page() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [step, setStep] = useState<Step>('idle');
-  const [activeTab, setActiveTab] = useState<MintTab>('manual');
+  const [activeTab, setActiveTab] = useState<MintTab>('connect');
   const [payTo, setPayTo] = useState('');
   const [amount6, setAmount6] = useState('1000000');
   const [txHashManual, setTxHashManual] = useState('');
@@ -337,7 +337,7 @@ export default function Page() {
             <span>💳</span> Payment Methods
           </h2>
           <div className="flex gap-2 mb-6 flex-wrap">
-              {(['manual', 'qr', 'connect'] as MintTab[]).map((tab) => (
+              {(['connect', 'qr', 'manual'] as MintTab[]).map((tab) => (
                 <button
                   key={tab}
                   className={`${pillButton} ${
