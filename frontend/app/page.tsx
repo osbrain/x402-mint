@@ -3,25 +3,25 @@
 import axios from 'axios';
 import QRCode from 'react-qr-code';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useChainId, useWatchAsset } from 'wagmi';
-import { parseUnits, getAddress } from 'viem';
+import { useAccount, useConnect, useDisconnect, useSwitchChain, useChainId, useWatchAsset, useSignTypedData } from 'wagmi';
+import { getAddress } from 'viem';
 import { base } from 'wagmi/chains';
 
-const erc20Abi = [
-  {
-    inputs: [
-      { internalType: 'address', name: 'recipient', type: 'address' },
-      { internalType: 'uint256', name: 'amount', type: 'uint256' }
-    ],
-    name: 'transfer',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  }
-] as const;
+type Step = 'idle' | 'signing' | 'needpay' | 'verifying' | 'done' | 'err';
+type MintTab = 'manual' | 'qr' | 'gasless';
 
-type Step = 'idle' | 'needpay' | 'verifying' | 'done' | 'err';
-type MintTab = 'manual' | 'qr' | 'connect';
+type GaslessConfig = {
+  facilitator: string;
+  authorizationDomain: {
+    name: string;
+    version: string;
+    chainId: number;
+    verifyingContract: string;
+  };
+  authorizationTypes: Record<string, { name: string; type: string }[]>;
+  authorizationWindowSeconds: number;
+  clockDriftAllowanceSeconds: number;
+};
 
 type Stats = {
   tokenAddress: string;
@@ -39,6 +39,7 @@ type Stats = {
   perWalletUsdcCap: string;
   mintUnitUsdc: string;
   mintUnitUsdc6: string;
+  gasless?: GaslessConfig;
 };
 
 const spark = (value?: string) => {
@@ -46,6 +47,18 @@ const spark = (value?: string) => {
   const num = Number(value);
   if (Number.isNaN(num)) return value;
   return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+};
+
+const generateNonce = () => {
+  const bytes = new Uint8Array(32);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 };
 
 const sectionClass = 'rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur shadow-xl shadow-black/40';
@@ -57,20 +70,19 @@ export default function Page() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [step, setStep] = useState<Step>('idle');
-  const [activeTab, setActiveTab] = useState<MintTab>('connect');
+  const [activeTab, setActiveTab] = useState<MintTab>('gasless');
   const [payTo, setPayTo] = useState('');
   const [amount6, setAmount6] = useState('1000000');
   const [txHashManual, setTxHashManual] = useState('');
   const [addrManual, setAddrManual] = useState('');
   const [msg, setMsg] = useState('');
-  const [autoTxHash, setAutoTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const [gaslessResult, setGaslessResult] = useState<{ paymentTx?: string; distributorTx?: string; nonce?: string } | null>(null);
   const [isAddingToken, setIsAddingToken] = useState(false);
 
   const { address, isConnected } = useAccount();
   const { connect, connectors, status: connectStatus, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
-  const { writeContractAsync } = useWriteContract();
-  const { data: receipt, isLoading: waitingReceipt } = useWaitForTransactionReceipt({ hash: autoTxHash, chainId: stats?.chainId });
+  const { signTypedDataAsync } = useSignTypedData();
   const { switchChainAsync } = useSwitchChain();
   const currentChainId = useChainId();
   const { watchAsset } = useWatchAsset();
@@ -98,13 +110,6 @@ export default function Page() {
   useEffect(() => {
     fetchStats();
   }, []);
-
-  useEffect(() => {
-    if (receipt && receipt.status === 'success' && autoTxHash && address) {
-      handleVerify(autoTxHash, address, true);
-      setAutoTxHash(undefined);
-    }
-  }, [receipt, autoTxHash, address]);
 
   const handleVerify = async (hash: string, wallet: string, auto?: boolean) => {
     const trimmedHash = hash.trim();
@@ -165,84 +170,131 @@ export default function Page() {
     return `ethereum:${stats.usdcAddress}@${stats.chainId}/transfer?address=${stats.treasury}&uint256=${stats.mintUnitUsdc6}`;
   }, [stats]);
 
-  const handleWalletPayment = async () => {
-    console.log('handleWalletPayment called', { stats, address, isConnected });
-
+  const handleGaslessTransfer = async () => {
     if (!address || !isConnected) {
+      setStep('err');
       setMsg('Please connect your wallet first');
       return;
     }
 
-    if (!stats) {
-      setMsg('Loading contract info... Please wait and try again');
+    if (!stats || !stats.gasless) {
+      setStep('err');
+      setMsg('Gasless configuration not loaded yet');
       return;
     }
 
+    const fromAddress = getAddress(address);
+    const toAddress = getAddress(stats.treasury);
+    const targetChainId = stats.gasless.authorizationDomain.chainId;
+    const valueRaw = stats.mintUnitUsdc6 || amount6;
+
+    let transferAmount: bigint;
     try {
-      // Check if we're on the correct network (Base mainnet = 8453)
-      const targetChainId = stats.chainId;
-
-      // Try to switch to Base network if needed
-      if (switchChainAsync) {
-        try {
-          setMsg('Checking network...');
-          await switchChainAsync({ chainId: targetChainId });
-          setMsg('Network switched successfully. Please sign the transaction.');
-        } catch (switchError: any) {
-          console.error('Chain switch error:', switchError);
-          if (switchError?.message?.includes('User rejected')) {
-            setMsg('Please switch to Base network in your wallet to continue');
-            setStep('err');
-            return;
-          }
-          // Continue anyway - maybe already on correct chain
-        }
-      }
-
-      // Normalize addresses using getAddress to ensure proper checksum
-      const usdcAddress = getAddress(stats.usdcAddress);
-      const treasuryAddress = getAddress(stats.treasury);
-
-      console.log('Attempting to send USDC transfer:', {
-        usdcAddress,
-        treasury: treasuryAddress,
-        amount: stats.mintUnitUsdc,
-        chainId: stats.chainId
-      });
-
-      setMsg('Opening wallet... Please sign the transaction');
-
-      const hash = await writeContractAsync({
-        address: usdcAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [treasuryAddress as `0x${string}`, parseUnits(stats.mintUnitUsdc, 6)],
-        chainId: stats.chainId
-      });
-
-      console.log('Transaction sent:', hash);
-      setAutoTxHash(hash);
-      setStep('verifying');
-      setMsg('Payment sent! Waiting for blockchain confirmation...');
-    } catch (error: any) {
-      console.error('Payment error:', error);
+      transferAmount = BigInt(valueRaw);
+    } catch {
       setStep('err');
+      setMsg('Invalid mint amount configuration');
+      return;
+    }
 
-      // Better error messages
-      let errorMsg = 'Payment failed';
-      if (error?.message?.includes('User rejected')) {
-        errorMsg = 'Transaction was rejected in wallet';
-      } else if (error?.message?.includes('insufficient funds')) {
-        errorMsg = 'Insufficient USDC balance';
-      } else if (error?.message?.includes('chain')) {
-        errorMsg = 'Please switch your wallet to Base network (Chain ID: 8453)';
-      } else if (error?.shortMessage) {
-        errorMsg = error.shortMessage;
-      } else if (error?.message) {
-        errorMsg = error.message;
+    setGaslessResult(null);
+
+    if (switchChainAsync && targetChainId && currentChainId && currentChainId !== targetChainId) {
+      try {
+        setMsg('Attempting to switch network to match authorization domain...');
+        await switchChainAsync({ chainId: targetChainId });
+      } catch (switchError: any) {
+        console.warn('Network switch error:', switchError);
+        if (switchError?.message?.includes('User rejected') || switchError?.code === 4001) {
+          setStep('err');
+          setMsg('Please switch your wallet to the required network to continue');
+          return;
+        }
+        setMsg('Unable to auto-switch network. Please verify your wallet is on the correct chain before continuing.');
       }
+    }
 
-      setMsg(errorMsg);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const driftAllowance = stats.gasless.clockDriftAllowanceSeconds ?? 120;
+    const windowSeconds = stats.gasless.authorizationWindowSeconds ?? 900;
+    const effectiveDrift = Math.max(0, Math.min(driftAllowance, windowSeconds - 1));
+    const validAfter = BigInt(Math.max(0, nowSeconds - effectiveDrift));
+    const validBefore = validAfter + BigInt(windowSeconds);
+    const nonce = generateNonce();
+
+    const typedMessage = {
+      from: fromAddress,
+      to: toAddress,
+      value: transferAmount,
+      validAfter,
+      validBefore,
+      nonce,
+    };
+
+    const typedDomain = {
+      ...stats.gasless.authorizationDomain,
+      verifyingContract: getAddress(stats.gasless.authorizationDomain.verifyingContract) as `0x${string}`,
+    };
+
+    setStep('signing');
+    setMsg('Check your wallet to sign the gasless authorization');
+
+    let signature: `0x${string}`;
+    try {
+      signature = await signTypedDataAsync({
+        domain: typedDomain,
+        primaryType: 'TransferWithAuthorization',
+        types: stats.gasless.authorizationTypes as Record<string, { name: string; type: string }[]>,
+        message: typedMessage,
+      });
+    } catch (error: any) {
+      console.error('signTypedData error:', error);
+      setStep('err');
+      if (error?.message?.includes('User rejected') || error?.code === 4001) {
+        setMsg('Signature request was rejected in wallet');
+      } else {
+        setMsg(error?.message || 'Failed to sign authorization');
+      }
+      return;
+    }
+
+    setStep('verifying');
+    setMsg('Facilitator is submitting your gasless transfer...');
+
+    try {
+      const response = await axios.post(
+        '/api/gasless/transfer',
+        {
+          authorization: {
+            from: fromAddress,
+            to: toAddress,
+            value: transferAmount.toString(),
+            validAfter: validAfter.toString(),
+            validBefore: validBefore.toString(),
+            nonce,
+          },
+          signature,
+        },
+        { timeout: 120_000 }
+      );
+
+      if (response.data.ok) {
+        setStep('done');
+        setGaslessResult({
+          paymentTx: response.data.paymentTx,
+          distributorTx: response.data.distributorTx,
+          nonce,
+        });
+        setMsg('Gasless transfer completed! Facilitator covered the gas.');
+        fetchStats();
+      } else {
+        setStep('err');
+        setMsg(response.data.error || 'Gasless transfer failed');
+      }
+    } catch (error: any) {
+      console.error('gasless transfer error:', error);
+      setStep('err');
+      setMsg(error?.response?.data?.error || error?.message || 'Gasless transfer failed');
     }
   };
 
@@ -388,7 +440,7 @@ export default function Page() {
             <span>💳</span> Payment Methods
           </h2>
           <div className="flex gap-2 mb-6 flex-wrap">
-              {(['connect', 'qr', 'manual'] as MintTab[]).map((tab) => (
+              {(['gasless', 'qr', 'manual'] as MintTab[]).map((tab) => (
                 <button
                   key={tab}
                   className={`${pillButton} ${
@@ -400,7 +452,7 @@ export default function Page() {
                 >
                   {tab === 'manual' && '📝 Manual Entry'}
                   {tab === 'qr' && '📱 QR Code'}
-                  {tab === 'connect' && '🔗 Wallet Connect'}
+                  {tab === 'gasless' && '⚡ Gasless Transfer'}
                 </button>
               ))}
             </div>
@@ -487,13 +539,13 @@ export default function Page() {
               </div>
               <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
                 <p className="text-xs text-white/80">
-                  💡 <strong>Tip:</strong> After the payment confirms, return to the <strong>Manual Entry</strong> tab to paste your transaction hash, or use the <strong>Wallet Connect</strong> tab for automatic verification.
+                  💡 <strong>Tip:</strong> After the payment confirms, return to the <strong>Manual Entry</strong> tab to paste your transaction hash, or use the <strong>Gasless Transfer</strong> tab for the facilitated flow.
                 </p>
               </div>
             </div>
           )}
 
-          {activeTab === 'connect' && (
+          {activeTab === 'gasless' && (
             <div className="space-y-5 text-sm">
               <StepHeading number={1} title="Connect Wallet" subtitle="Connect your EVM-compatible wallet" />
 
@@ -527,7 +579,7 @@ export default function Page() {
                       <p className="font-semibold mb-1">Wrong Network</p>
                       <p className="text-xs text-white/80 mb-3">
                         Your wallet is connected to Chain ID {currentChainId}, but this app requires Base mainnet (Chain ID: 8453).
-                        Please switch networks or click the Pay button and we'll help you switch automatically.
+                        Please switch networks or click the Gasless Transfer button and we'll help you switch automatically.
                       </p>
                     </div>
                   </div>
@@ -590,27 +642,51 @@ export default function Page() {
                 )}
               </div>
 
-              <StepHeading number={2} title="Pay & Auto-Verify" subtitle="Payment will be verified automatically" />
-              <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-xl p-5 space-y-3">
+              <StepHeading number={2} title="Sign Gasless Transfer" subtitle="Authorise a USDC transfer; facilitator pays the gas" />
+              <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-xl p-5 space-y-3 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-white/60">You will pay:</span>
+                  <span className="text-white/60">You authorise:</span>
                   <span className="font-semibold text-2xl text-cyan-400">{Number(amountReadable).toLocaleString()} USDC</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-white/60">You will receive:</span>
-                  <span className="font-semibold text-lg">~5,000 LICODE</span>
+                  <span className="text-white/60">Sent to treasury:</span>
+                  <span className="font-mono text-xs">{stats?.treasury}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-white/60">Facilitator:</span>
+                  <span className="font-mono text-xs">
+                    {stats?.gasless?.facilitator ? `${stats.gasless.facilitator.slice(0, 10)}...${stats.gasless.facilitator.slice(-6)}` : 'Loading...'}
+                  </span>
                 </div>
               </div>
               <button
                 className={buttonPrimary}
-                disabled={!isConnected || waitingReceipt}
-                onClick={handleWalletPayment}
+                disabled={!isConnected || step === 'signing' || step === 'verifying'}
+                onClick={handleGaslessTransfer}
               >
-                {waitingReceipt ? '⏳ Waiting for confirmation...' : `💰 Pay ${Number(amountReadable).toLocaleString()} USDC`}
+                {step === 'signing'
+                  ? '✍️ Waiting for wallet signature...'
+                  : step === 'verifying'
+                  ? '⏳ Facilitator submitting transfer...'
+                  : `⚡ Sign & Send ${Number(amountReadable).toLocaleString()} USDC`}
               </button>
+              {gaslessResult && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-xs space-y-2">
+                  <p className="font-semibold text-sm text-green-300">Gasless transfer complete</p>
+                  {gaslessResult.paymentTx && (
+                    <AddressRow label="Payment Tx" value={gaslessResult.paymentTx} onCopy={() => copyToClipboard(gaslessResult.paymentTx!)} />
+                  )}
+                  {gaslessResult.distributorTx && (
+                    <AddressRow label="Distributor Tx" value={gaslessResult.distributorTx} onCopy={() => copyToClipboard(gaslessResult.distributorTx!)} />
+                  )}
+                  {gaslessResult.nonce && (
+                    <AddressRow label="Nonce" value={gaslessResult.nonce} onCopy={() => copyToClipboard(gaslessResult.nonce!)} />
+                  )}
+                </div>
+              )}
               <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
                 <p className="text-xs text-white/80">
-                  💡 <strong>Tip:</strong> Once the transaction confirms on-chain, we'll automatically verify it and distribute LICODE tokens to your connected wallet.
+                  💡 <strong>Tip:</strong> We submit the signed authorization on-chain and cover the gas. After two confirmations (USDC transfer + LICODE distribution) you will see both transaction hashes above.
                 </p>
               </div>
             </div>
@@ -631,7 +707,15 @@ export default function Page() {
           >
             <div className="flex items-start gap-3">
               <span className="text-2xl">
-                {step === 'done' ? '✅' : step === 'err' ? '❌' : step === 'verifying' ? '⏳' : 'ℹ️'}
+                {step === 'done'
+                  ? '✅'
+                  : step === 'err'
+                  ? '❌'
+                  : step === 'verifying'
+                  ? '⏳'
+                  : step === 'signing'
+                  ? '✍️'
+                  : 'ℹ️'}
               </span>
               <div className="flex-1">
                 <p className="font-semibold mb-1">
@@ -640,7 +724,9 @@ export default function Page() {
                     : step === 'err'
                     ? 'Error'
                     : step === 'verifying'
-                    ? 'Verifying...'
+                    ? 'Processing...'
+                    : step === 'signing'
+                    ? 'Awaiting Signature'
                     : 'Info'}
                 </p>
                 <p className="text-sm text-white/80 break-words">{msg}</p>

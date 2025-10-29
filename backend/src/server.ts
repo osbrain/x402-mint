@@ -6,7 +6,11 @@ import { ethers } from "ethers";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import Redis from "ioredis";
-import { erc20Iface } from "./chain";
+import {
+  TRANSFER_WITH_AUTHORIZATION_TYPES,
+  erc20Iface,
+  usdcEip3009Interface,
+} from "./chain";
 
 dotenv.config();
 
@@ -69,8 +73,18 @@ if (ENABLE_RATE_LIMIT) {
     max: 5,
     message: { error: 'Too many verification attempts, please wait' }
   });
+  const gaslessLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 5,
+    keyGenerator: (req) => {
+      const from = (req.body?.authorization?.from || "").toLowerCase();
+      return `${req.ip}:${from}`;
+    },
+    message: { error: 'Too many gasless transfers, please wait' }
+  });
 
   app.use('/verify', verifyLimiter);
+  app.use('/gasless/transfer', gaslessLimiter);
   app.use(globalLimiter);
   console.log('Rate limiting enabled');
 }
@@ -81,19 +95,119 @@ if (ENABLE_RATE_LIMIT) {
 const RPC = process.env.RPC_URL_BASE;
 const provider = new ethers.JsonRpcProvider(RPC);
 
-const TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-const USDC_ADDRESS = process.env.USDC_ADDRESS;
-const TREASURY = (process.env.TREASURY_ADDRESS || "").toLowerCase();
+const RAW_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
+const RAW_USDC_ADDRESS = process.env.USDC_ADDRESS;
+const RAW_TREASURY_ADDRESS = process.env.TREASURY_ADDRESS;
 const PK = process.env.DISTRIBUTOR_PRIVATE_KEY;
 const MINT_USDC_6 = process.env.MINT_USDC_6 || "1000000";
 const CHAIN_ID = Number(process.env.CHAIN_ID || "8453");
 
-if (!RPC || !TOKEN_ADDRESS || !USDC_ADDRESS || !TREASURY || !PK) {
+if (!RPC || !RAW_TOKEN_ADDRESS || !RAW_USDC_ADDRESS || !RAW_TREASURY_ADDRESS || !PK) {
   throw new Error("Missing required env vars (RPC_URL_BASE, TOKEN_ADDRESS, USDC_ADDRESS, TREASURY_ADDRESS, DISTRIBUTOR_PRIVATE_KEY)");
 }
 
+const TOKEN_ADDRESS = ethers.getAddress(RAW_TOKEN_ADDRESS);
+const USDC_ADDRESS = ethers.getAddress(RAW_USDC_ADDRESS);
+const TREASURY_CHECKSUM = ethers.getAddress(RAW_TREASURY_ADDRESS);
+const TREASURY = TREASURY_CHECKSUM.toLowerCase();
+
+const AUTHORIZATION_WINDOW_SECONDS = Number(process.env.AUTHORIZATION_WINDOW_SECONDS || "900"); // default 15 minutes
+const AUTHORIZATION_CLOCK_DRIFT_SECONDS = Number(process.env.AUTHORIZATION_CLOCK_DRIFT_SECONDS || "120"); // allow 2 minutes drift
+const AUTHORIZATION_RECORD_TTL_SECONDS = Number(process.env.AUTHORIZATION_RECORD_TTL_SECONDS || "172800"); // keep records 2 days
+
+const TRANSFER_AUTHORIZATION_DOMAIN = {
+  name: "USD Coin",
+  version: "2",
+  chainId: CHAIN_ID,
+  verifyingContract: USDC_ADDRESS,
+} as const;
+
+type AuthorizationStatus = "pending" | "broadcasted" | "completed" | "failed";
+type AuthorizationRecord = {
+  status: AuthorizationStatus;
+  from: string;
+  to: string;
+  value: string;
+  validAfter: number;
+  validBefore: number;
+  nonce: string;
+  signature: string;
+  paymentTx?: string;
+  distributorTx?: string;
+  error?: string;
+  updatedAt: number;
+};
+
+const inMemoryAuthorizationCache = new Map<string, AuthorizationRecord>();
+
+const authCacheKey = (from: string, nonce: string) =>
+  `auth:${from.toLowerCase()}:${nonce.toLowerCase()}`;
+
+const AUTH_RECORD_TTL_MS = AUTHORIZATION_RECORD_TTL_SECONDS * 1000;
+
+async function readAuthorizationRecord(key: string): Promise<AuthorizationRecord | null> {
+  if (redis && REDIS_ENABLED) {
+    const stored = await redis.get(key);
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored) as AuthorizationRecord;
+    } catch {
+      return null;
+    }
+  }
+  return inMemoryAuthorizationCache.get(key) ?? null;
+}
+
+async function writeAuthorizationRecord(
+  key: string,
+  record: AuthorizationRecord,
+  { onlyIfAbsent }: { onlyIfAbsent?: boolean } = {}
+): Promise<boolean> {
+  if (redis && REDIS_ENABLED) {
+    try {
+      if (onlyIfAbsent) {
+        const result = await redis.set(key, JSON.stringify(record), "PX", AUTH_RECORD_TTL_MS, "NX");
+        return result === "OK";
+      }
+      await redis.set(key, JSON.stringify(record), "PX", AUTH_RECORD_TTL_MS);
+      return true;
+    } catch (error) {
+      console.error("Redis writeAuthorizationRecord failed:", (error as Error).message);
+      if (onlyIfAbsent) {
+        // fall back to memory cache
+      } else {
+        return false;
+      }
+    }
+  }
+
+  if (onlyIfAbsent && inMemoryAuthorizationCache.has(key)) {
+    return false;
+  }
+  inMemoryAuthorizationCache.set(key, record);
+  return true;
+}
+
+async function dropAuthorizationRecord(key: string) {
+  if (redis && REDIS_ENABLED) {
+    try {
+      await redis.del(key);
+      return;
+    } catch (error) {
+      console.error("Redis dropAuthorizationRecord failed:", (error as Error).message);
+    }
+  }
+  inMemoryAuthorizationCache.delete(key);
+}
+
 const signer = new ethers.Wallet(PK.startsWith("0x") ? PK : `0x${PK}`, provider);
-signer.getAddress().then((addr) => console.log("Distributor signer:", addr));
+let FACILITATOR_ADDRESS = "";
+signer.getAddress()
+  .then((addr) => {
+    FACILITATOR_ADDRESS = ethers.getAddress(addr);
+    console.log("Distributor signer:", FACILITATOR_ADDRESS);
+  })
+  .catch((err) => console.error("Failed to resolve facilitator signer address:", err));
 
 const distributionIface = new ethers.Interface([
   "function distribute(address to, uint256 usdcAmount6) external",
@@ -115,6 +229,11 @@ const statsIface = new ethers.Interface([
 
 const token = new ethers.Contract(TOKEN_ADDRESS, distributionIface, signer);
 const tokenRead = new ethers.Contract(TOKEN_ADDRESS, statsIface, provider);
+const usdcAuthorizationContract = new ethers.Contract(
+  USDC_ADDRESS,
+  usdcEip3009Interface(),
+  signer
+);
 
 // ============================================
 // API 端点
@@ -150,13 +269,16 @@ app.get("/stats", async (_req: Request, res: Response) => {
     const mintedPercentBps = Number((minted * 10000n) / totalSupplyNonZero);
     const mintUnit6 = BigInt(MINT_USDC_6);
 
+    const facilitatorAddress =
+      FACILITATOR_ADDRESS || ethers.getAddress(await signer.getAddress());
+
     res.json({
-      tokenAddress: ethers.getAddress(TOKEN_ADDRESS),
-      treasury: ethers.getAddress(TREASURY),
+      tokenAddress: TOKEN_ADDRESS,
+      treasury: TREASURY_CHECKSUM,
       distributor: ethers.getAddress(distributorAddress),
       owner: ethers.getAddress(ownerAddress),
       chainId: CHAIN_ID,
-      usdcAddress: ethers.getAddress(USDC_ADDRESS),
+      usdcAddress: USDC_ADDRESS,
       totalSupplyTokens: ethers.formatUnits(totalSupply, 18),
       mintedTokens: ethers.formatUnits(minted, 18),
       remainingTokens: ethers.formatUnits(contractBalance, 18),
@@ -165,11 +287,327 @@ app.get("/stats", async (_req: Request, res: Response) => {
       totalUsdcCap: ethers.formatUnits(totalUsdcCapValue, 6),
       perWalletUsdcCap: ethers.formatUnits(perWalletCapValue, 6),
       mintUnitUsdc: ethers.formatUnits(mintUnit6, 6),
-      mintUnitUsdc6: MINT_USDC_6
+      mintUnitUsdc6: MINT_USDC_6,
+      gasless: {
+        facilitator: facilitatorAddress,
+        authorizationDomain: TRANSFER_AUTHORIZATION_DOMAIN,
+        authorizationTypes: TRANSFER_WITH_AUTHORIZATION_TYPES,
+        authorizationWindowSeconds: AUTHORIZATION_WINDOW_SECONDS,
+        clockDriftAllowanceSeconds: AUTHORIZATION_CLOCK_DRIFT_SECONDS
+      }
     });
   } catch (error: any) {
     console.error("Failed to build stats", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// 无 Gas 授权转账（ERC-3009）
+// ============================================
+app.post("/gasless/transfer", async (req: Request, res: Response) => {
+  const payload = req.body as {
+    authorization?: {
+      from?: string;
+      to?: string;
+      value?: string | number | bigint;
+      validAfter?: string | number | bigint;
+      validBefore?: string | number | bigint;
+      nonce?: string;
+    };
+    signature?: string;
+  };
+
+  try {
+    if (!payload?.authorization || typeof payload.signature !== "string") {
+      return res.status(400).json({ error: "authorization and signature are required" });
+    }
+
+    const { authorization } = payload;
+    const { from, to, value, validAfter, validBefore, nonce } = authorization;
+
+    if (!from || !to || value === undefined || validAfter === undefined || validBefore === undefined || !nonce) {
+      return res.status(400).json({ error: "authorization fields missing" });
+    }
+
+    let fromAddress: string;
+    let toAddress: string;
+    try {
+      fromAddress = ethers.getAddress(from);
+      toAddress = ethers.getAddress(to);
+    } catch {
+      return res.status(400).json({ error: "invalid from/to address" });
+    }
+
+    if (toAddress.toLowerCase() !== TREASURY.toLowerCase()) {
+      return res.status(400).json({ error: "authorization recipient mismatch" });
+    }
+
+    const parseToBigInt = (input: string | number | bigint, field: string): bigint => {
+      try {
+        if (typeof input === "bigint") return input;
+        if (typeof input === "number") return BigInt(Math.floor(input));
+        if (typeof input === "string" && input.trim() !== "") return BigInt(input.trim());
+      } catch {
+        // swallow to throw below
+      }
+      throw new Error(`invalid ${field}`);
+    };
+
+    const valueBig = parseToBigInt(value, "value");
+    const validAfterBig = parseToBigInt(validAfter, "validAfter");
+    const validBeforeBig = parseToBigInt(validBefore, "validBefore");
+
+    if (valueBig <= 0n) {
+      return res.status(400).json({ error: "invalid transfer value" });
+    }
+
+    const required6 = BigInt(MINT_USDC_6);
+    if (valueBig !== required6) {
+      return res.status(400).json({ error: `value must equal ${MINT_USDC_6}` });
+    }
+
+    if (typeof nonce !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(nonce)) {
+      return res.status(400).json({ error: "nonce must be 32-byte hex string" });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const validAfterNum = Number(validAfterBig);
+    const validBeforeNum = Number(validBeforeBig);
+    if (!Number.isFinite(validAfterNum) || !Number.isFinite(validBeforeNum)) {
+      return res.status(400).json({ error: "authorization validity window is invalid" });
+    }
+
+    if (validBeforeNum <= validAfterNum) {
+      return res.status(400).json({ error: "validBefore must be greater than validAfter" });
+    }
+
+    const windowSeconds = validBeforeNum - validAfterNum;
+    if (windowSeconds > AUTHORIZATION_WINDOW_SECONDS) {
+      return res.status(400).json({ error: `authorization window too long (>${AUTHORIZATION_WINDOW_SECONDS}s)` });
+    }
+
+    if (validAfterNum > now + AUTHORIZATION_CLOCK_DRIFT_SECONDS) {
+      return res.status(400).json({ error: "authorization not yet valid" });
+    }
+
+    if (validBeforeNum <= now - AUTHORIZATION_CLOCK_DRIFT_SECONDS) {
+      return res.status(400).json({ error: "authorization already expired" });
+    }
+
+    const sanitizedMessage = {
+      from: fromAddress,
+      to: toAddress,
+      value: valueBig,
+      validAfter: validAfterBig,
+      validBefore: validBeforeBig,
+      nonce,
+    };
+
+    let signature: ethers.Signature;
+    try {
+      const recovered = ethers.verifyTypedData(
+        TRANSFER_AUTHORIZATION_DOMAIN,
+        TRANSFER_WITH_AUTHORIZATION_TYPES,
+        sanitizedMessage,
+        payload.signature
+      );
+
+      if (recovered.toLowerCase() !== fromAddress.toLowerCase()) {
+        return res.status(400).json({ error: "signature does not match authorizer" });
+      }
+
+      signature = ethers.Signature.from(payload.signature);
+    } catch (err: any) {
+      console.error("verifyTypedData failed:", err);
+      return res.status(400).json({ error: "invalid authorization signature" });
+    }
+
+    const cacheKey = authCacheKey(fromAddress, nonce);
+    const existing = await readAuthorizationRecord(cacheKey);
+    if (existing?.status === "completed") {
+      return res.status(200).json({
+        ok: true,
+        paymentTx: existing.paymentTx,
+        distributorTx: existing.distributorTx,
+        status: existing.status,
+      });
+    }
+    if (existing?.status === "failed") {
+      await dropAuthorizationRecord(cacheKey);
+    } else if (existing) {
+      return res.status(409).json({ error: "authorization already processing", status: existing.status, paymentTx: existing.paymentTx });
+    }
+
+    // Check on-chain auth state and minting limits before spending gas
+    const [alreadyUsed, walletSoFar, perWalletCap, counted, totalCap] = await Promise.all([
+      usdcAuthorizationContract.authorizationState(fromAddress, nonce),
+      token.usdcByWallet(fromAddress),
+      token.perWalletUsdcCap(),
+      token.usdcCounted(),
+      token.totalUsdcCap(),
+    ]);
+
+    if (alreadyUsed) {
+      return res.status(409).json({ error: "authorization already used on-chain" });
+    }
+
+    if (walletSoFar + required6 > perWalletCap) {
+      return res.status(400).json({ error: "wallet cap reached" });
+    }
+
+    if (counted + required6 > totalCap) {
+      return res.status(400).json({ error: "total cap reached" });
+    }
+
+    const initialRecord: AuthorizationRecord = {
+      status: "pending",
+      from: fromAddress,
+      to: toAddress,
+      value: valueBig.toString(),
+      validAfter: validAfterNum,
+      validBefore: validBeforeNum,
+      nonce,
+      signature: payload.signature,
+      updatedAt: Date.now(),
+    };
+
+    const reserved = await writeAuthorizationRecord(cacheKey, initialRecord, { onlyIfAbsent: true });
+    if (!reserved) {
+      const snapshot = await readAuthorizationRecord(cacheKey);
+      return res.status(409).json({ error: "authorization already submitted", status: snapshot?.status, paymentTx: snapshot?.paymentTx });
+    }
+
+    let transferTx;
+    try {
+      transferTx = await usdcAuthorizationContract.transferWithAuthorization(
+        fromAddress,
+        toAddress,
+        valueBig,
+        validAfterBig,
+        validBeforeBig,
+        nonce,
+        signature.v,
+        signature.r,
+        signature.s
+      );
+    } catch (error: any) {
+      await dropAuthorizationRecord(cacheKey);
+      console.error("transferWithAuthorization broadcast failed:", error);
+      const message = error?.shortMessage || error?.error?.message || error?.message || "transferWithAuthorization failed";
+      return res.status(502).json({ error: message });
+    }
+
+    await writeAuthorizationRecord(cacheKey, {
+      ...initialRecord,
+      status: "broadcasted",
+      paymentTx: transferTx.hash,
+      updatedAt: Date.now(),
+    });
+
+    const transferReceipt = await transferTx.wait();
+    if (transferReceipt.status !== 1) {
+      await writeAuthorizationRecord(cacheKey, {
+        ...initialRecord,
+        status: "failed",
+        paymentTx: transferTx.hash,
+        error: "transferWithAuthorization reverted",
+        updatedAt: Date.now(),
+      });
+      return res.status(502).json({ error: "transferWithAuthorization reverted", paymentTx: transferTx.hash });
+    }
+
+    let distributeTx;
+    try {
+      distributeTx = await token.distribute(fromAddress, required6);
+    } catch (error: any) {
+      console.error("token.distribute failed after payment:", error);
+      await writeAuthorizationRecord(cacheKey, {
+        ...initialRecord,
+        status: "failed",
+        paymentTx: transferTx.hash,
+        error: "distribution failed after payment",
+        updatedAt: Date.now(),
+      });
+      return res.status(500).json({
+        error: "distribution failed after payment; please contact support with payment tx hash",
+        paymentTx: transferTx.hash,
+      });
+    }
+
+    const distributeReceipt = await distributeTx.wait();
+    if (distributeReceipt.status !== 1) {
+      await writeAuthorizationRecord(cacheKey, {
+        ...initialRecord,
+        status: "failed",
+        paymentTx: transferTx.hash,
+        distributorTx: distributeTx.hash,
+        error: "distribution reverted",
+        updatedAt: Date.now(),
+      });
+      return res.status(500).json({
+        error: "distribution reverted after payment; please contact support",
+        paymentTx: transferTx.hash,
+        distributorTx: distributeTx.hash,
+      });
+    }
+
+    const finalRecord: AuthorizationRecord = {
+      ...initialRecord,
+      status: "completed",
+      paymentTx: transferTx.hash,
+      distributorTx: distributeTx.hash,
+      updatedAt: Date.now(),
+    };
+    await writeAuthorizationRecord(cacheKey, finalRecord);
+
+    console.log("/gasless/transfer ✅ completed", {
+      from: fromAddress,
+      value: valueBig.toString(),
+      paymentTx: transferTx.hash,
+      distributorTx: distributeTx.hash,
+    });
+
+    res.json({
+      ok: true,
+      paymentTx: transferTx.hash,
+      distributorTx: distributeTx.hash,
+      status: finalRecord.status,
+    });
+  } catch (error: any) {
+    console.error("/gasless/transfer error:", error);
+    res.status(500).json({ error: error?.message || "internal error" });
+  }
+});
+
+app.get("/gasless/status", async (req: Request, res: Response) => {
+  const fromRaw = (req.query.from as string | undefined) || "";
+  const nonce = (req.query.nonce as string | undefined) || "";
+  if (!fromRaw || !nonce) {
+    return res.status(400).json({ error: "from and nonce are required" });
+  }
+
+  let from: string;
+  try {
+    from = ethers.getAddress(fromRaw);
+  } catch {
+    return res.status(400).json({ error: "invalid from address" });
+  }
+
+  if (!/^0x[0-9a-fA-F]{64}$/.test(nonce)) {
+    return res.status(400).json({ error: "invalid nonce format" });
+  }
+
+  try {
+    const key = authCacheKey(from, nonce);
+    const record = await readAuthorizationRecord(key);
+    if (!record) {
+      return res.status(404).json({ error: "authorization not found" });
+    }
+    res.json(record);
+  } catch (error: any) {
+    console.error("/gasless/status error:", error);
+    res.status(500).json({ error: error?.message || "internal error" });
   }
 });
 
@@ -365,14 +803,14 @@ app.get("/health", async (_req: Request, res: Response) => {
 const port = process.env.PORT || 3001;
 app.listen(port, () => {
   console.log(`
-╔════════════════════════════════════════╗
-║   🚀 LICODE Backend Server            ║
-╠════════════════════════════════════════╣
-║   Port: ${port}
-║   Redis: ${REDIS_ENABLED ? 'enabled' : 'DISABLED ⚠️'}
-║   Rate Limit: ${ENABLE_RATE_LIMIT ? 'enabled' : 'disabled'}
-║   CORS: ${ENABLE_CORS ? 'enabled' : 'disabled'}
-╚════════════════════════════════════════╝
+═══════════════════════════════════════
+      🚀 LICODE Backend Server             
+═══════════════════════════════════════
+  Port: ${port}
+  Redis: ${REDIS_ENABLED ? 'enabled' : 'DISABLED ⚠️'}
+  Rate Limit: ${ENABLE_RATE_LIMIT ? 'enabled' : 'disabled'}
+  CORS: ${ENABLE_CORS ? 'enabled' : 'disabled'}
+════════════════════════════════════════
   `);
 });
 
