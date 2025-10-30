@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { ethers } from "ethers";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
+import helmet from "helmet";
 import Redis from "ioredis";
 import {
   TRANSFER_WITH_AUTHORIZATION_TYPES,
@@ -15,8 +16,34 @@ import {
 dotenv.config();
 
 const app = express();
-app.set('trust proxy', true);
+// Restrict trusted proxies to local/link-local by default; override with TRUST_PROXY env if needed
+const TRUST_PROXY = process.env.TRUST_PROXY || 'loopback, linklocal, uniquelocal';
+app.set('trust proxy', TRUST_PROXY);
 app.use(express.json());
+
+// ============================================
+// HTTP 安全响应头（Helmet）
+// ============================================
+const IS_PROD = process.env.NODE_ENV === 'production';
+app.use(helmet({
+  // 仅在生产开启 CSP，避免本地开发受限
+  contentSecurityPolicy: IS_PROD ? {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
+    }
+  } : false,
+  referrerPolicy: { policy: "no-referrer" },
+  frameguard: { action: 'deny' },
+  hsts: IS_PROD ? { maxAge: 15552000, includeSubDomains: true, preload: false } : false,
+  crossOriginEmbedderPolicy: false, // 避免影响现有前后端交互
+}));
 
 // ============================================
 // CORS 配置（可选，开发环境可关闭）
@@ -54,6 +81,11 @@ if (REDIS_ENABLED) {
 } else {
   console.warn('⚠️ WARNING: Redis not configured - replay protection DISABLED!');
   console.warn('   Set REDIS_URL environment variable to enable security');
+}
+
+// 生产环境强制启用 Redis（无则拒绝启动）
+if (IS_PROD && !REDIS_ENABLED) {
+  throw new Error('Redis required in production (set REDIS_URL)');
 }
 
 // ============================================
@@ -114,6 +146,8 @@ const TREASURY = TREASURY_CHECKSUM.toLowerCase();
 const AUTHORIZATION_WINDOW_SECONDS = Number(process.env.AUTHORIZATION_WINDOW_SECONDS || "900"); // default 15 minutes
 const AUTHORIZATION_CLOCK_DRIFT_SECONDS = Number(process.env.AUTHORIZATION_CLOCK_DRIFT_SECONDS || "120"); // allow 2 minutes drift
 const AUTHORIZATION_RECORD_TTL_SECONDS = Number(process.env.AUTHORIZATION_RECORD_TTL_SECONDS || "172800"); // keep records 2 days
+// /verify 端点处理记录 TTL（默认 30 天）
+const VERIFY_RECORD_TTL_MS = Number(process.env.VERIFY_RECORD_TTL_MS || String(30 * 24 * 60 * 60 * 1000));
 
 const TRANSFER_AUTHORIZATION_DOMAIN = {
   name: "USD Coin",
@@ -724,7 +758,7 @@ app.post("/verify", async (req: Request, res: Response) => {
           distributorTx: tx.hash,
           timestamp: Date.now(),
           ip: req.ip
-        }));
+        }), 'PX', VERIFY_RECORD_TTL_MS);
       } catch (redisError: any) {
         // Redis写入失败 - 记录错误但不影响响应
         console.error("/verify Redis write failed:", redisError.message);
