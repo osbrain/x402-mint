@@ -617,6 +617,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 **⭐ 如果这个项目对你有帮助，请给它一个 Star！**
 
-Made with ❤️ by LICODE Team
-
 </div>
