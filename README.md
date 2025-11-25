@@ -1,4 +1,4 @@
-# LICODE x402 Token Minting System
+# x402 Token Minting System
 
 <div align="center">
 
@@ -6,354 +6,372 @@
 [![Base Network](https://img.shields.io/badge/Network-Base-blue.svg)](https://base.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**完整的区块链代币铸造系统，基于 Base 网络实现 x402 支付验证模式**
+**A full-stack token minting system on Base implementing the x402 payment verification pattern.**
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [部署指南](#-部署指南) • [文档](#-文档) • [技术架构](#-技术架构)
+_完整的 Base 网络代币铸造全栈脚手架，实现 x402 支付校验模式。_
 
 </div>
 
 ---
 
-## 📋 目录
-
-- [项目简介](#-项目简介)
-- [功能特性](#-功能特性)
-- [技术栈](#-技术栈)
-- [快速开始](#-快速开始)
-- [部署指南](#-部署指南)
-  - [合约部署](#1-智能合约部署)
-  - [后端部署](#2-后端服务部署)
-  - [前端部署](#3-前端应用部署)
-- [项目结构](#-项目结构)
-- [核心流程](#-核心流程)
-- [配置说明](#-配置说明)
-- [文档](#-文档)
-- [运维指南](#-运维指南)
-- [安全考虑](#-安全考虑)
+![x402 Minting UI](images/image.png)
 
 ---
 
-## 🎯 项目简介
+## 📋 Table of Contents
 
-LICODE x402 是一个基于 Base 区块链的全栈代币铸造系统，实现了创新的 **x402 支付验证模式**。用户通过支付 USDC 来铸造 LICODE 代币，整个过程通过智能合约和后端验证系统确保安全可靠。
-
-### 核心机制
-
-- **固定兑换率**：默认 1 USDC = 5,000 LICODE
-- **双重限额保护**：总量限额 + 单钱包限额
-- **链上支付验证**：后端验证 USDC 转账后自动分发代币
-- **安全的分发模式**：采用 Distributor 模式，代币由合约托管
-
----
-
-## ✨ 功能特性
-
-### 智能合约
-- ✅ ERC-20 标准代币实现
-- ✅ Distributor 授权分发模式
-- ✅ 双重限额机制（总量 + 单钱包）
-- ✅ 所有者提取功能（用于流动性池）
-- ✅ 安全的权限管理
-
-### 后端服务
-- ✅ HTTP 402 支付协议实现
-- ✅ 链上交易验证
-- ✅ USDC Transfer 事件扫描
-- ✅ 自动代币分发
-- ✅ Redis 防重放攻击
-- ✅ 速率限制保护
-- ✅ CORS 跨域支持
-- ✅ 健康检查端点
-
-### 前端应用
-- ✅ Next.js 14 + TypeScript
-- ✅ 钱包连接（wagmi）
-- ✅ 三种支付方式：
-  - 手动提交交易哈希
-  - 扫描 QR 码支付
-  - 钱包直接转账
-- ✅ 实时统计数据展示
-- ✅ 响应式设计
+- [Overview](#-overview)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Quick Start](#-quick-start)
+- [Deployment](#-deployment)
+  - [Smart Contracts](#1-smart-contract-deployment)
+  - [Backend](#2-backend-deployment)
+  - [Frontend](#3-frontend-deployment)
+- [Project Structure](#-project-structure)
+- [Core Flow](#-core-flow)
+- [Configuration](#-configuration)
+- [Documentation](#-documentation)
+- [Ops & Maintenance](#-ops--maintenance)
+- [Security](#-security)
+- [中文说明](#-中文说明)
 
 ---
 
-## 🛠 技术栈
+## 🎯 Overview
 
-### 智能合约
+LICODE x402 is a full-stack token minting system built on the Base network. It implements an **x402 payment verification pattern**, where users pay in USDC and receive LICODE tokens, with the whole process secured end-to-end by smart contracts and a verification backend.
+
+### Core Mechanics
+
+- Fixed exchange rate – default `1 USDC = 5,000 LICODE`
+- Dual cap protection – global cap plus per-wallet cap
+- On-chain payment verification – backend verifies USDC transfers before minting
+- Safe distribution model – Distributor pattern with tokens held in the contract
+
+---
+
+## ✨ Features
+
+### Smart Contracts
+
+- ERC-20 token implementation
+- Distributor-based authorized distribution
+- Dual cap logic (total supply plus per wallet)
+- Owner withdrawal for liquidity provisioning
+- Minimal and explicit roles and permissions
+
+### Backend Service
+
+- HTTP 402 payment protocol flow
+- On-chain transaction verification
+- USDC `Transfer` event scanning
+- Automatic token distribution via `distribute()`
+- Redis-based replay protection
+- Rate limiting
+- CORS support
+- Health check endpoint
+
+### Frontend App
+
+- Next.js 14 plus TypeScript
+- Wallet connection via wagmi and viem
+- Three payment flows:
+  - Manually submit transaction hash
+  - Pay via QR code
+  - Direct wallet transfer
+- Realtime stats display
+- Responsive layout
+
+---
+
+## 🛠 Tech Stack
+
+### Smart Contracts
+
 - Solidity 0.8.24
-- OpenZeppelin 5.0
+- OpenZeppelin 5.x
 - Hardhat 2.22
 
-### 后端
-- Node.js + TypeScript
+### Backend
+
+- Node.js plus TypeScript
 - Express 4.19
-- ethers.js 6.10
-- Redis (可选，用于防重放)
+- ethers.js 6.x
+- Redis (optional, recommended in production)
 - express-rate-limit
 
-### 前端
+### Frontend
+
 - Next.js 14.2
 - React 18
-- wagmi 2.13
-- viem 2.9
-- TanStack Query 5.59
+- wagmi 2.x
+- viem 2.x
+- TanStack Query 5.x
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 前置要求
+### Prerequisites
 
-- Node.js >= 18.x
-- pnpm >= 8.x
+- Node.js 18 or newer
+- pnpm 8 or newer
 - Git
-- Redis (生产环境推荐)
+- Redis (recommended for testnet, required for production)
 
-### 安装依赖
+### Install Dependencies
 
 ```bash
-# 克隆项目
+# Clone
 git clone <repository-url>
-cd x402mint-main
+cd x402-mint
 
-# 安装根目录依赖（智能合约）
+# Root deps (contracts and tooling)
 pnpm install
 
-# 安装后端依赖
+# Backend
 cd backend
 pnpm install
 
-# 安装前端依赖
+# Frontend
 cd ../frontend
 pnpm install
-
-cd ..
 ```
 
-### 本地开发（测试网）
+### Local Development (Testnet)
 
-#### 1. 配置环境变量
+#### 1. Environment Variables
 
-**根目录 `.env`**:
+Root `.env`:
+
 ```bash
 cp .env.example .env
-# 编辑 .env，填写测试网配置
+# Edit .env to point to your Base testnet RPC and deployment keys.
 ```
 
-**后端 `backend/.env`**:
+Backend `backend/.env`:
+
 ```bash
 cd backend
 cp .env.example .env
-# 编辑 backend/.env，填写后端配置
+# Edit backend/.env with contract addresses and RPC settings.
 ```
 
-**前端 `frontend/.env.local`**:
+Frontend `frontend/.env.local`:
+
 ```bash
-cd frontend
+cd ../frontend
 cp .env.example .env.local
-# 编辑 frontend/.env.local，填写前端配置
+# Edit frontend/.env.local with chain id and contract addresses.
 ```
 
-#### 2. 编译合约
+#### 2. Compile Contracts
 
 ```bash
 pnpm build
 ```
 
-#### 3. 部署到测试网
+#### 3. Deploy to Testnet
 
 ```bash
-# 部署到 Base Sepolia
+# Deploy to Base Sepolia
 pnpm run deploySepolia
 ```
 
-记录输出的合约地址，更新到 `backend/.env` 和 `frontend/.env.local`。
+Copy the emitted token address into `backend/.env` and `frontend/.env.local`.
 
-#### 4. 启动后端服务
+#### 4. Start Backend
 
 ```bash
 cd backend
 pnpm run dev
-# 服务运行在 http://localhost:3001
+# http://localhost:3001
 ```
 
-#### 5. 启动前端应用
+#### 5. Start Frontend
 
 ```bash
-cd frontend
+cd ../frontend
 pnpm run dev
-# 访问 http://localhost:3000
+# http://localhost:3000
 ```
 
 ---
 
-## 📦 部署指南
+## 📦 Deployment
 
-### 1. 智能合约部署
+### 1. Smart Contract Deployment
 
-详细步骤请查看：[**合约部署指南**](docs/deployment/contract-deployment.md)
+Full guide: `docs/deployment/contract-deployment.md`.
 
-#### 快速部署流程
+#### One-shot Deployment
 
 ```bash
-# 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env，填写以下关键信息：
-# - DEPLOYER_PRIVATE_KEY（需要有 ETH）
+# Edit .env with:
+# - DEPLOYER_PRIVATE_KEY (with gas on Base)
 # - OWNER_ADDRESS
 # - DISTRIBUTOR_ADDRESS
-# - 代币参数（可选，有默认值）
+# - Token parameters (optional; defaults are provided)
 
-# 2. 编译合约
 pnpm build
 
-# 3. 部署（选择网络）
-pnpm run deploySepolia  # 测试网
-# 或
-pnpm run deploy         # 主网
+# Testnet
+pnpm run deploySepolia
 
-# 4. 验证合约（可选）
+# Mainnet
+pnpm run deploy
+
+# Optional: verify
 TOKEN_ADDRESS=0x... pnpm run verify
 ```
 
-#### 关键配置参数
+#### Key Parameters
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `DEPLOYER_PRIVATE_KEY` | 部署者私钥（需要 ETH） | - |
-| `OWNER_ADDRESS` | 合约所有者地址 | - |
-| `DISTRIBUTOR_ADDRESS` | 分发者地址（后端 EOA） | - |
-| `TOTAL_SUPPLY_18` | 代币总供应量 | 1000000000 (10亿) |
-| `TOKENS_PER_USDC_18` | 兑换率 | 5000 |
-| `TOTAL_USDC_CAP_6` | 总 USDC 限额 | 100000000000 (10万) |
-| `PER_WALLET_USDC_CAP_6` | 单钱包限额 | 10000000 (10 USDC) |
+| Env var                 | Description                             | Default             |
+|-------------------------|-----------------------------------------|---------------------|
+| `DEPLOYER_PRIVATE_KEY`  | Deployer private key (needs gas)        | -                   |
+| `OWNER_ADDRESS`         | Contract owner                          | -                   |
+| `DISTRIBUTOR_ADDRESS`   | Distributor EOA (backend signer)        | -                   |
+| `TOTAL_SUPPLY_18`       | Token total supply (18 decimals)        | `1000000000`        |
+| `TOKENS_PER_USDC_18`    | Exchange rate (18 decimals)             | `5000`              |
+| `TOTAL_USDC_CAP_6`      | Global USDC cap (6 decimals)            | `100000000000`      |
+| `PER_WALLET_USDC_CAP_6` | Per-wallet USDC cap (6 decimals)        | `10000000` (10 USD) |
 
-### 2. 后端服务部署
+### 2. Backend Deployment
 
-详细步骤请查看：[**后端部署指南**](docs/deployment/backend-deployment.md)
+Full guide: `docs/deployment/backend-deployment.md`.
 
-#### 配置环境变量
+#### Environment
 
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-编辑 `backend/.env`:
+Edit `backend/.env`:
 
 ```bash
-# 必需配置
 RPC_URL_BASE="https://mainnet.base.org"
-TOKEN_ADDRESS="0x合约地址"           # 步骤1部署的地址
-USDC_ADDRESS="0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # Base 主网 USDC
-TREASURY_ADDRESS="0x收款地址"        # 接收用户 USDC 的地址
-DISTRIBUTOR_PRIVATE_KEY="0x..."     # 对应合约中的 DISTRIBUTOR_ADDRESS
-MINT_USDC_6="1000000"               # 1 USDC
-CHAIN_ID="8453"                     # Base 主网
+TOKEN_ADDRESS="0xYourToken"          # from step 1
+USDC_ADDRESS="0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # Base mainnet USDC
+TREASURY_ADDRESS="0xTreasury"        # receives user USDC
+DISTRIBUTOR_PRIVATE_KEY="0x..."      # must match DISTRIBUTOR_ADDRESS
+MINT_USDC_6="1000000"                # 1 USDC
+CHAIN_ID="8453"                      # Base mainnet
 
-# 安全配置（生产环境必需）
+# Security (production)
 REDIS_URL="redis://localhost:6379"
 ENABLE_CORS="true"
 ENABLE_RATE_LIMIT="true"
 FRONTEND_URL="https://your-domain.com"
 ```
 
-#### 启动服务
+#### Run
 
-**开发环境**:
+Development:
+
 ```bash
 pnpm run dev
 ```
 
-**生产环境**:
-```bash
-# 使用 PM2
-pnpm install -g pm2
-pnpm run build
-pm2 start dist/server.js --name licode-backend
+Production with PM2:
 
-# 或使用 Docker
+```bash
+pnpm run build
+pnpm install -g pm2
+pm2 start dist/server.js --name licode-backend
+```
+
+Or Docker:
+
+```bash
 docker build -t licode-backend .
 docker run -d -p 3001:3001 --env-file .env licode-backend
 ```
 
-### 3. 前端应用部署
+### 3. Frontend Deployment
 
-详细步骤请查看：[**前端部署指南**](docs/deployment/frontend-deployment.md)
+Full guide: `docs/deployment/frontend-deployment.md`.
 
-#### 配置环境变量
+#### Environment
 
 ```bash
 cd frontend
 cp .env.example .env.local
 ```
 
-编辑 `frontend/.env.local`:
+Edit `frontend/.env.local`:
 
 ```bash
 NEXT_PUBLIC_CHAIN_ID=8453
-NEXT_PUBLIC_TOKEN_ADDRESS="0x合约地址"
+NEXT_PUBLIC_TOKEN_ADDRESS="0xYourToken"
 NEXT_PUBLIC_USDC_ADDRESS="0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
-NEXT_PUBLIC_TREASURY_ADDRESS="0x收款地址"
-NEXT_PUBLIC_MINT_USDC="1"  # 用户界面显示
+NEXT_PUBLIC_TREASURY_ADDRESS="0xTreasury"
+NEXT_PUBLIC_MINT_USDC="1"
 ```
 
-#### 构建和部署
+#### Build and Run
 
-**Vercel 部署** (推荐):
+Vercel (recommended):
+
 ```bash
 pnpm install -g vercel
 vercel --prod
 ```
 
-**传统服务器部署**:
+Node server:
+
 ```bash
 pnpm run build
 pnpm start
-# 或使用 PM2
+# or
 pm2 start npm --name licode-frontend -- start
 ```
 
 ---
 
-## 📁 项目结构
+## 📁 Project Structure
 
-```
-x402mint-main/
-├── contracts/              # 智能合约
-│   └── LicodeToken.sol    # 主合约文件
-├── scripts/               # 部署和管理脚本
-│   ├── deploy.ts          # 合约部署脚本
-│   ├── verify.ts          # 合约验证脚本
-│   └── withdraw.ts        # 代币提取脚本
-├── backend/               # 后端服务
+```text
+x402-mint/
+├── contracts/              # Solidity contracts
+│   └── LicodeToken.sol     # Main token contract
+├── scripts/                # Hardhat scripts
+│   ├── deploy.ts
+│   ├── verify.ts
+│   └── withdraw.ts
+├── backend/                # Backend service
 │   ├── src/
-│   │   └── server.ts      # Express 服务器
+│   │   └── server.ts       # Express server
 │   ├── package.json
 │   └── .env.example
-├── frontend/              # 前端应用
+├── frontend/               # Frontend app
 │   ├── app/
-│   │   ├── page.tsx       # 主页面
-│   │   ├── providers.tsx  # Web3 Provider
-│   │   └── layout.tsx     # 布局
+│   │   ├── page.tsx
+│   │   ├── providers.tsx
+│   │   └── layout.tsx
 │   ├── package.json
 │   └── .env.example
-├── docs/                  # 文档目录
-│   ├── deployment/        # 部署文档
-│   ├── security/          # 安全文档
-│   ├── architecture/      # 架构文档
-│   └── guides/            # 使用指南
-├── .env.example           # 环境变量示例
-├── hardhat.config.ts      # Hardhat 配置
+├── docs/                   # Documentation
+│   ├── deployment/
+│   ├── security/
+│   ├── architecture/
+│   └── guides/
+├── images/
+│   └── image.png           # Demo screenshot
+├── .env.example
+├── hardhat.config.ts
 ├── package.json
-└── README.md              # 本文件
+└── README.md
 ```
 
 ---
 
-## 🔄 核心流程
+## 🔄 Core Flow
 
-### 用户铸造代币流程
+User mint flow:
 
 ```mermaid
 sequenceDiagram
@@ -363,258 +381,280 @@ sequenceDiagram
     participant Base RPC
     participant Contract
 
-    User->>Frontend: 1. 请求铸造
+    User->>Frontend: 1. Request mint
     Frontend->>Backend: 2. GET /api/mint
-    Backend-->>Frontend: 3. 返回 402 + 支付信息
-    Frontend-->>User: 4. 显示支付地址和金额
+    Backend-->>Frontend: 3. 402 + payment instructions
+    Frontend-->>User: 4. Show address and amount
 
-    User->>Base RPC: 5. 转账 USDC 到 Treasury
-    Base RPC-->>User: 6. 返回交易哈希
+    User->>Base RPC: 5. Send USDC to Treasury
+    Base RPC-->>User: 6. Return tx hash
 
-    User->>Frontend: 7. 提交交易哈希
+    User->>Frontend: 7. Submit tx hash
     Frontend->>Backend: 8. POST /api/verify
-    Backend->>Base RPC: 9. 获取交易 receipt
-    Base RPC-->>Backend: 10. 返回交易详情
-    Backend->>Backend: 11. 验证 USDC Transfer 事件
-    Backend->>Contract: 12. 调用 distribute()
-    Contract-->>Backend: 13. 分发完成
-    Backend-->>Frontend: 14. 返回成功
-    Frontend-->>User: 15. 显示成功消息
+    Backend->>Base RPC: 9. Fetch receipt
+    Base RPC-->>Backend: 10. Tx details
+    Backend->>Backend: 11. Validate USDC Transfer event
+    Backend->>Contract: 12. Call distribute()
+    Contract-->>Backend: 13. Mint or transfer LICODE
+    Backend-->>Frontend: 14. Success response
+    Frontend-->>User: 15. Show success message
 ```
 
-### 关键步骤说明
+---
 
-1. **支付请求**：前端向后端请求铸造信息
-2. **HTTP 402 响应**：后端返回支付详情（金额、地址）
-3. **用户转账**：用户向 Treasury 地址转账 USDC
-4. **提交验证**：用户提交交易哈希到后端
-5. **链上验证**：后端获取交易 receipt，验证 Transfer 事件
-6. **检查限额**：验证总量和单钱包限额
-7. **分发代币**：后端调用合约 `distribute()` 方法
-8. **完成铸造**：用户收到 LICODE 代币
+## ⚙️ Configuration
+
+### Network
+
+| Network       | Chain ID | RPC URL                  | USDC address                                 |
+|--------------|----------|--------------------------|----------------------------------------------|
+| Base Mainnet | 8453     | https://mainnet.base.org | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
+| Base Sepolia | 84532    | https://sepolia.base.org | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+### Important Addresses
+
+- `DEPLOYER_ADDRESS` – deploys contracts, pays gas
+- `OWNER_ADDRESS` – can call `ownerWithdraw()` and `setDistributor()`
+- `DISTRIBUTOR_ADDRESS` – backend EOA that calls `distribute()`
+- `TREASURY_ADDRESS` – receives user USDC payments
+
+### Decimals and Math
+
+- LICODE token: 18 decimals (standard ERC-20)
+- USDC: 6 decimals
+- USDC values stored as 6-decimal integers in the contract
+- Conversion: `tokens = (usdcAmount6 * tokensPerUsdc) / 1e6`
 
 ---
 
-## ⚙️ 配置说明
+## 📚 Documentation
 
-### 网络配置
-
-| 网络 | Chain ID | RPC URL | USDC 地址 |
-|------|----------|---------|-----------|
-| Base Mainnet | 8453 | https://mainnet.base.org | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
-| Base Sepolia | 84532 | https://sepolia.base.org | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-
-### 重要地址说明
-
-- **DEPLOYER_ADDRESS**: 部署合约的地址，需要 ETH 支付 gas
-- **OWNER_ADDRESS**: 合约所有者，可以调用 `ownerWithdraw()` 和 `setDistributor()`
-- **DISTRIBUTOR_ADDRESS**: 后端服务的 EOA 地址，可以调用 `distribute()`
-- **TREASURY_ADDRESS**: 接收用户 USDC 支付的地址
-
-### 精度说明
-
-- **LICODE 代币**：18 位小数（标准 ERC-20）
-- **USDC**：6 位小数
-- **合约存储**：以 6 位小数记录 USDC 金额
-- **转换公式**：`tokens = (usdcAmount6 * tokensPerUsdc) / 1e6`
+- `docs/deployment/contract-deployment.md` – contract deployment
+- `docs/deployment/backend-deployment.md` – backend deployment
+- `docs/deployment/frontend-deployment.md` – frontend deployment
+- `docs/deployment/部署验证指南.md` – post-deployment checks
+- `docs/security/安全加固部署指南.md` – production security hardening
+- `docs/security/安全校验分析.md` – security analysis
+- `docs/security/权限配置指南.md` – roles and permissions
+- `docs/architecture/licode_x_402_mint_prd_full_stack_scaffold.md` – architecture
+- `docs/guides/功能完整性检查.md` – functional test checklist
 
 ---
 
-## 📚 文档
+## 🔧 Ops and Maintenance
 
-### 部署文档
-- [合约部署指南](docs/deployment/contract-deployment.md) - 详细的合约部署步骤
-- [后端部署指南](docs/deployment/backend-deployment.md) - 后端服务部署和配置
-- [前端部署指南](docs/deployment/frontend-deployment.md) - 前端应用部署
-- [部署验证指南](docs/deployment/部署验证指南.md) - 部署后的验证流程
-
-### 安全文档
-- [安全加固指南](docs/security/安全加固部署指南.md) - 生产环境安全配置
-- [安全校验分析](docs/security/安全校验分析.md) - 安全审计要点
-- [权限配置指南](docs/security/权限配置指南.md) - 角色和权限管理
-
-### 架构文档
-- [技术架构文档](docs/architecture/licode_x_402_mint_prd_full_stack_scaffold.md) - 完整的技术架构说明
-
-### 使用指南
-- [功能完整性检查](docs/guides/功能完整性检查.md) - 功能测试清单
-
----
-
-## 🔧 运维指南
-
-### 更换 Distributor
-
-如果需要更换后端分发账户：
+### Rotate Distributor
 
 ```bash
-# 1. 使用 Hardhat Console
 npx hardhat console --network base
-
-# 2. 连接合约
-const token = await ethers.getContractAt("LicodeToken", "0x合约地址")
-
-# 3. 调用 setDistributor（需要 Owner 权限）
-await token.setDistributor("0x新Distributor地址")
-
-# 4. 更新后端环境变量
-# 编辑 backend/.env 中的 DISTRIBUTOR_PRIVATE_KEY
-
-# 5. 重启后端服务
+const token = await ethers.getContractAt("LicodeToken", "0xToken")
+await token.setDistributor("0xNewDistributor")  # owner only
 ```
 
-### 提取代币到流动性池
+Then update `DISTRIBUTOR_PRIVATE_KEY` in `backend/.env` and restart the backend.
 
-使用 `withdraw.ts` 脚本提取代币：
+### Withdraw Tokens to Liquidity
 
 ```bash
-# 1. 在根目录 .env 中配置
-WITHDRAW_TO_ADDRESS=0x目标地址
-WITHDRAW_AMOUNT_18=1000000  # 100万代币
-TOKEN_ADDRESS=0x合约地址
+# In root .env
+WITHDRAW_TO_ADDRESS=0xTarget
+WITHDRAW_AMOUNT_18=1000000
+TOKEN_ADDRESS=0xToken
 
-# 2. 运行脚本（需要 Owner 权限）
 npx hardhat run scripts/withdraw.ts --network base
 ```
 
-### 监控和日志
+### Monitoring
 
-**后端健康检查**:
+Health:
+
 ```bash
 curl http://localhost:3001/health
 ```
 
-返回信息包括：
-- Redis 连接状态
-- RPC 节点状态
-- 当前区块高度
-- Distributor 余额
+Output includes Redis status, RPC status, current block height, and distributor balance.
 
-**查看后端日志**:
+Logs:
+
 ```bash
-# PM2
 pm2 logs licode-backend
-
-# Docker
+# or
 docker logs -f <container-id>
 ```
 
-### 常见问题排查
+---
 
-**问题 1: Distributor 余额不足**
-```bash
-# 解决方案：向 Distributor 地址充值 ETH
-# 建议保持余额 >= 0.1 ETH
-```
+## 🔒 Security
 
-**问题 2: Redis 连接失败**
-```bash
-# 检查 Redis 状态
-redis-cli ping
+### Pre-production Checklist
 
-# 启动 Redis
-brew services start redis  # macOS
-sudo systemctl start redis # Linux
-```
+- Keys
+  - Use environment variables or a secret manager for private keys.
+  - Never commit keys to version control.
+  - Separate deployer, owner, and distributor accounts.
+  - Prefer hardware wallet or multi-sig for owner.
 
-**问题 3: USDC 地址错误**
-```bash
-# 确认使用正确网络的 USDC 地址
-# Base 主网: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
-# Base Sepolia: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
-```
+- Backend
+  - Enable Redis replay protection.
+  - Enable rate limiting (`ENABLE_RATE_LIMIT=true`).
+  - Configure CORS (`FRONTEND_URL`).
+  - Serve behind HTTPS (Nginx, Cloudflare, and similar).
+  - Ensure distributor has sufficient ETH for gas.
+
+- Contracts
+  - Fully test on testnet.
+  - Verify source code on explorer.
+  - Double-check caps and token economics.
+  - Validate USDC address per network.
+
+- Monitoring
+  - Set up logs and alerts.
+  - Backup critical configuration files.
 
 ---
 
-## 🔒 安全考虑
+## 🤝 Contributing and Support
 
-### 生产部署前检查清单
+- See the docs under `docs/`.
+- Open issues or suggestions via your Git hosting platform.
 
-- [ ] **私钥安全**
-  - [ ] 使用环境变量存储私钥
-  - [ ] 不要提交私钥到版本控制
-  - [ ] DEPLOYER 和 DISTRIBUTOR 使用不同地址
-  - [ ] OWNER 使用硬件钱包或多签
-
-- [ ] **后端安全**
-  - [ ] 启用 Redis 防重放攻击
-  - [ ] 启用速率限制 (`ENABLE_RATE_LIMIT=true`)
-  - [ ] 配置 CORS (`FRONTEND_URL`)
-  - [ ] 使用 HTTPS（Nginx/Cloudflare）
-  - [ ] Distributor 账户有足够 ETH
-
-- [ ] **合约安全**
-  - [ ] 在测试网完整测试
-  - [ ] 验证合约源码
-  - [ ] 检查限额配置合理性
-  - [ ] USDC 地址正确无误
-
-- [ ] **监控和备份**
-  - [ ] 配置监控和告警
-  - [ ] 备份关键配置文件
-  - [ ] 准备应急预案
-
-### 关键安全机制
-
-1. **双重限额保护**
-   - 合约层强制执行总量和单钱包限额
-   - 后端预检查，节省 gas
-
-2. **防重放攻击**
-   - Redis 记录已处理的交易哈希
-   - 防止同一笔交易被多次处理
-
-3. **速率限制**
-   - 每个 IP 5 次/分钟
-   - 防止暴力攻击
-
-4. **权限分离**
-   - Owner: 只能提取代币和更换 Distributor
-   - Distributor: 只能分发代币
-   - 两者不托管代币，只需要 gas
-
----
-
-## 📞 支持和贡献
-
-### 获取帮助
-
-- 查看 [文档目录](docs/)
-- 提交 [Issue](../../issues)
-
-### 开发规范
+Development helpers:
 
 ```bash
-# 运行测试
-pnpm test
-
-# 代码格式化
-pnpm format
-
-# 类型检查
-pnpm typecheck
+pnpm test       # tests
+pnpm format     # formatting
+pnpm typecheck  # type checking
 ```
 
 ---
 
 ## 📄 License
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+MIT – see `LICENSE`.
 
 ---
 
-## 🙏 致谢
+## 🙏 Credits
 
-- [OpenZeppelin](https://openzeppelin.com/) - 安全的智能合约库
-- [Hardhat](https://hardhat.org/) - 以太坊开发环境
-- [Base](https://base.org/) - Layer 2 区块链网络
-- [Next.js](https://nextjs.org/) - React 框架
-- [wagmi](https://wagmi.sh/) - React Hooks for Ethereum
+- [OpenZeppelin](https://openzeppelin.com/)
+- [Hardhat](https://hardhat.org/)
+- [Base](https://base.org/)
+- [Next.js](https://nextjs.org/)
+- [wagmi](https://wagmi.sh/)
 
 ---
 
-<div align="center">
+## 🇨🇳 中文说明
 
-**⭐ 如果这个项目对你有帮助，请给它一个 Star！**
+下面是简体中文版本的简介和使用说明，内容与英文版保持一致，便于中文用户快速上手。
 
-</div>
+### 项目概览
+
+LICODE x402 是一个部署在 Base 区块链上的代币铸造全栈系统，实现了 **x402 支付校验模式**。用户通过支付 USDC 获得 LICODE 代币，整个流程由智能合约和后端服务共同保证安全与合规。
+
+核心机制：
+
+- 固定兑换率：默认 `1 USDC = 5,000 LICODE`
+- 双重限额：总额度加单钱包限额
+- 链上支付校验：后端校验 USDC 转账后再触发代币分发
+- Distributor 分发模式：代币托管在合约中，由指定账号调用 `distribute()` 分发
+
+### 功能特性
+
+- 智能合约
+  - 标准 ERC-20 实现
+  - Distributor 授权分发
+  - 总量与单地址双重限额
+  - Owner 提币（用于流动性等场景）
+  - 明确的角色与权限管理
+
+- 后端服务
+  - HTTP 402 支付协议流程
+  - 基于 ethers 的链上交易校验
+  - USDC `Transfer` 事件扫描
+  - 自动调用合约分发代币
+  - Redis 防重放
+  - 速率限制与 CORS 支持
+  - 健康检查接口
+
+- 前端应用
+  - Next.js 14 和 TypeScript
+  - 基于 wagmi/viem 的钱包连接
+  - 支持三种支付方式：手动提交哈希、扫码支付、直接转账
+  - 实时统计与状态展示
+  - 响应式界面
+
+### 快速开始（本地测试网）
+
+1. 安装依赖
+
+```bash
+git clone <repository-url>
+cd x402-mint
+pnpm install
+cd backend && pnpm install
+cd ../frontend && pnpm install
+```
+
+2. 配置环境变量
+
+```bash
+cp .env.example .env              # 根目录
+cd backend && cp .env.example .env
+cd ../frontend && cp .env.example .env.local
+```
+
+根据实际 RPC、合约地址等修改三个环境变量文件。
+
+3. 编译并部署合约
+
+```bash
+pnpm build
+pnpm run deploySepolia   # 部署到 Base Sepolia
+```
+
+将部署输出的合约地址写入 `backend/.env` 与 `frontend/.env.local`。
+
+4. 启动服务
+
+```bash
+cd backend && pnpm run dev        # http://localhost:3001
+cd ../frontend && pnpm run dev    # http://localhost:3000
+```
+
+### 网络与地址
+
+- Base 主网（ChainId: 8453）
+  - RPC: `https://mainnet.base.org`
+  - USDC: `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`
+- Base Sepolia（ChainId: 84532）
+  - RPC: `https://sepolia.base.org`
+  - USDC: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
+
+重要地址说明：
+
+- `DEPLOYER_ADDRESS`：部署合约地址，需要支付 gas
+- `OWNER_ADDRESS`：Owner 地址，可调用 `ownerWithdraw()` 和 `setDistributor()`
+- `DISTRIBUTOR_ADDRESS`：后端使用的 EOA，负责调用 `distribute()`
+- `TREASURY_ADDRESS`：接收用户 USDC 的地址
+
+### 精度与兑换公式
+
+- LICODE：18 位小数
+- USDC：6 位小数
+- 合约以内置 6 位精度记录 USDC
+- 兑换公式：`tokens = (usdcAmount6 * tokensPerUsdc) / 1e6`
+
+### 运维与安全要点
+
+- 启用 Redis 与速率限制，防止重放与暴力请求
+- 区分部署者、Owner、Distributor 三类账号，降低单点风险
+- 在测试网充分验证后再部署主网，并在区块浏览器上验证源码
+- 正确配置 CORS 和 HTTPS，避免明文传输敏感数据
+
+更多细节请参考仓库 `docs/` 目录中的部署、安全和架构文档。
+
+---
+
+如果这个项目对你有帮助，欢迎 Star 支持。
+
